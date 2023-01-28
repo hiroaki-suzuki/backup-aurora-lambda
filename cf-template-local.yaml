@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Resources:
+  # SecretManager
+  Secrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: hs-backup-aurora-local-secrets
+      SecretString: '{"db-host": "db", "db-name": "sample", "db-user": "rirazou", "db-password": "password"}'
+  # S3
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: hs-backup-aurora-local-bucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
