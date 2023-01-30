@@ -308,3 +308,9 @@ Resources:
       DBInstanceIdentifier: !Join [ "-", [ !Ref ProjectName, 'instance', "01" ] ]
       DBParameterGroupName: !Ref AuroraInstanceParameterGroup
       OptionGroupName: !Ref AuroraInstanceOptionGroup
+  # SecretManager
+  Secrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: hs-backup-aurora-secrets
+      SecretString: !Sub '{"db-host": "${AuroraCluster.Endpoint.Address}", "db-name": "sample", "db-user": "${MasterUsername}", "db-password": "${MasterUserPassword}"}'
