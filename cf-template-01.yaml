@@ -1,0 +1,9 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Resources:
+  # ECR
+  ECR:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: hs-backup-aurora-lambda-ecr

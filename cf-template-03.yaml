@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  MasterUsername:
+    Type: String
+  MasterUserPassword:
+    Type: String
+  DBHost:
+    Type: String
+
+Resources:
+  # SecretManager
+  Secrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: hs-backup-aurora-secrets
+      SecretString: !Sub '{"db-host": "${DBHost}", "db-name": "sample", "db-user": "${MasterUsername}", "db-password": "${MasterUserPassword}"}'

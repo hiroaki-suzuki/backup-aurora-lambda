@@ -12,3 +12,16 @@ Lambdaのイメージを作り、シェルを実行してS3にアップロード
     1. curl -XPOST "http://localhost:9000/2015-03-31/functions/function/invocations" -d '{}'
 5. レスポンスでS3にアップロードしたファイル名が出力され、DockerのログにLambdaのログが出力される
 6. S3を確認して、ファイルが有れば成功
+
+## AWS環境
+
+1. cf-template-01.yamlでECRを作る
+2. ECRに行き、該当のリポジトリの手順通りに、ローカルのイメージをプッシュする
+3. cf-template-02.yamlで、その他のリソースを作成する
+    1. パラメーターとして、ECRにプッシュしたイメージのURLを指定する（その他のパラメータも指定）
+4. cf-template-03.yamlで、SecretsManagerを作成する
+    1. パラメーターとして、DB情報を指定する
+5. 踏み台EC2にインスタンスコネクトで接続して、mysqlコマンドでAuroraに繋ぎinitdb.dにあるSQLを実行する
+6. 作成したLambdaを実行する
+7. レスポンスでS3にアップロードしたファイル名が出力され、DockerのログにLambdaのログが出力される
+8. S3を確認して、ファイルが有れば成功

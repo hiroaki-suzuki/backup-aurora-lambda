@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: hs-backup-aurora
+  EcrImageUri:
+    Description: ECR image URI
+    Type: String
+  CidrBlockVPC:
+    Type: String
+    Default: 172.16.0.0/16
+  CidrBlockPublicSubnetA:
+    Type: String
+    Default: 172.16.0.0/24
+  CidrBlockPrivateSubnetA:
+    Type: String
+    Default: 172.16.10.0/24
+  CidrBlockPrivateSubnetC:
+    Type: String
+    Default: 172.16.20.0/24
+  MasterUsername:
+    Type: String
+  MasterUserPassword:
+    Type: String
+
+Resources:
+  # VPC
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CidrBlockVPC
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "vpc" ] ]
+  # InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "igw" ] ]
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  # Subnet
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPublicSubnetA
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "a" ] ]
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPrivateSubnetA
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName,  "private", "subnet", "a" ] ]
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPrivateSubnetC
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName,  "private", "subnet", "c" ] ]
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "rtb" ] ]
+  RouteTablePublicAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      SubnetId: !Ref PublicSubnetA
+  RoutePublic:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+  PublicSubnetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "sg" ] ]
+      GroupDescription: "public subnet security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "sg" ] ]
+  PrivateSubnetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "private", "subnet", "sg" ] ]
+      GroupDescription: "private subnet security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !Ref CidrBlockPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "private", "subnet", "sg" ] ]
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "vpc", "endpoint", "sg" ] ]
+      GroupDescription: "vpc endpoint security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref CidrBlockPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "vpc", "endpoint", "sg" ] ]
+  # VPCエンドポイント
+  VPCEndpointSecretManager:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: com.amazonaws.ap-northeast-1.secretsmanager
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PublicSubnetA
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+  VPCEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: com.amazonaws.ap-northeast-1.s3
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      RouteTableIds:
+        - !Ref RouteTablePublic
+  # 踏み台EC2
+  BastionEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref AWS::StackName, "bastion", "ec2", "role" ] ]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/EC2InstanceConnect"
+  BastionEC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionEC2Role
+  BastionEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "ami-0bba69335379e17f8"
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref BastionEC2InstanceProfile
+      KeyName: aws-rirazou0101
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref PublicSubnetSecurityGroup
+          SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "bastion" ] ]
+      UserData:
+        "Fn::Base64":
+          !Sub |
+          #!/bin/bash
+          yum -y update
+          yum -y remove mariadb-libs
+          yum -y install https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm
+          yum-config-manager –disable mysql80-community
+          yum-config-manager –enable mysql57-community
+          rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+          yum -y install mysql-community-client
+  # S3
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join [ "-", [ !Ref ProjectName, "bucket" ] ]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+  # Lambda
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref ProjectName, "lambda", "role" ] ]
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref ProjectName, "dump", "table" ] ]
+      PackageType: Image
+      Code:
+        ImageUri: !Ref 'EcrImageUri'
+      Role:
+        Fn::GetAtt:
+          - LambdaRole
+          - Arn
+      Timeout: 60
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref PublicSubnetSecurityGroup
+        SubnetIds:
+          - !Ref PublicSubnetA
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: !Ref S3Bucket
+          SECRETS_NAME: hs-backup-aurora-secrets
+  # Aurora
+  AuroraSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Join [ "-", [ !Ref ProjectName, "sg" ] ]
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetC
+  AuroraClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      DBClusterParameterGroupName: !Join [ "-",[ !Ref ProjectName, "cluster", "pg" ] ]
+      Description: "Aurora ClusterParameterGroup"
+      Family: "aurora-mysql5.7"
+      Parameters:
+        time_zone: "Asia/Tokyo"
+  AuroraInstanceParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      DBParameterGroupName: !Join [ "-", [ !Ref ProjectName, "instance", "pg" ] ]
+      Description: "Aurora InstanceParameterGroup"
+      Family: "aurora-mysql5.7"
+  AuroraInstanceOptionGroup:
+    Type: AWS::RDS::OptionGroup
+    Properties:
+      EngineName: aurora-mysql
+      MajorEngineVersion: 5.7
+      OptionGroupDescription: "Aurora InstanceOptionGroup"
+      OptionGroupName: !Join [ "-", [ !Ref ProjectName, "instance", "og" ] ]
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      DBClusterIdentifier: !Join [ "-", [ !Ref ProjectName, "cluster" ] ]
+      DatabaseName: sample
+      DBClusterParameterGroupName: !Ref AuroraClusterParameterGroup
+      DBSubnetGroupName: !Ref AuroraSubnetGroup
+      Engine: aurora-mysql
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      Port: 3306
+      StorageEncrypted: True
+      VpcSecurityGroupIds:
+        - !Ref PrivateSubnetSecurityGroup
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref AuroraCluster
+      Engine: aurora-mysql
+      DBInstanceClass: 'db.t3.small'
+      DBInstanceIdentifier: !Join [ "-", [ !Ref ProjectName, 'instance', "01" ] ]
+      DBParameterGroupName: !Ref AuroraInstanceParameterGroup
+      OptionGroupName: !Ref AuroraInstanceOptionGroup
