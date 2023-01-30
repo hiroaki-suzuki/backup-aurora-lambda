@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/provided:al2.2023.01.11.06
+FROM --platform=linux/amd64 public.ecr.aws/lambda/provided:al2.2023.01.11.06
 
 RUN yum install -y gzip mariadb awscli jq && \
   yum clean all && rm -rf /var/cache/yum
