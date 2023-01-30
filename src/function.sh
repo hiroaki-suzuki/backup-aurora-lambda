@@ -10,7 +10,7 @@ function handler() {
 
   mysqldump --no-tablespaces -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" users | \
       gzip | \
-      aws s3 cp - s3://"$S3_BUCKET_NAME"/"$filename"
+      aws s3 cp - s3://"$S3_BUCKET_NAME"/backup/"$filename"
 
   echo "$filename"
 }
