@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join [ "-", [ !Ref ProjectName, "bucket" ] ]
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+
+Outputs:
+  S3Bucket:
+    Value: !Ref S3Bucket

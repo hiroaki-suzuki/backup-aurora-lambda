@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: hs-backup-aurora
+  CidrBlockVPC:
+    Type: String
+    Default: 172.16.0.0/16
+  CidrBlockPublicSubnetA:
+    Type: String
+    Default: 172.16.0.0/24
+  CidrBlockPrivateSubnetA:
+    Type: String
+    Default: 172.16.10.0/24
+  CidrBlockPrivateSubnetC:
+    Type: String
+    Default: 172.16.20.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref CidrBlockVPC
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "vpc" ] ]
+  # InternetGateway
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "igw" ] ]
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  # Subnet
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPublicSubnetA
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "a" ] ]
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPrivateSubnetA
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName,  "private", "subnet", "a" ] ]
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref CidrBlockPrivateSubnetC
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName,  "private", "subnet", "c" ] ]
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "rtb" ] ]
+  RouteTablePublicAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      SubnetId: !Ref PublicSubnetA
+  RoutePublic:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+Outputs:
+  VPC:
+    Value: !Ref VPC
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
+  PrivateSubnetA:
+    Value: !Ref PrivateSubnetA
+  PrivateSubnetC:
+    Value: !Ref PrivateSubnetC
+  RouteTablePublic:
+    Value: !Ref RouteTablePublic

@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+  EcrImageUri:
+    Type: String
+  PublicSubnetSecurityGroup:
+    Type: String
+  PublicSubnetA:
+    Type: String
+  S3Bucket:
+    Type: String
+  SecretId:
+    Type: String
+
+Resources:
+  # Lambda
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref ProjectName, "lambda", "role" ] ]
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/SecretsManagerReadWrite
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join [ "-", [ !Ref ProjectName, "backup", "table" ] ]
+      PackageType: Image
+      Code:
+        ImageUri: !Ref EcrImageUri
+      Role:
+        Fn::GetAtt:
+          - LambdaRole
+          - Arn
+      Timeout: 60
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref PublicSubnetSecurityGroup
+        SubnetIds:
+          - !Ref PublicSubnetA
+      Environment:
+        Variables:
+          S3_BUCKET_NAME: !Ref S3Bucket
+          SECRETS_ID: !Ref SecretId

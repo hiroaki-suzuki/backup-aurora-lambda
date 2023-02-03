@@ -1,4 +1,4 @@
-SECRET_STRING=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_NAME" --region ap-northeast-1 --query 'SecretString' --output text)
+SECRET_STRING=$(aws secretsmanager get-secret-value --secret-id "$SECRETS_ID" --region ap-northeast-1 --query 'SecretString' --output text)
 
 DB_HOST=$(echo "$SECRET_STRING" | jq -r '."db-host"')
 DB_NAME=$(echo "$SECRET_STRING" | jq -r '."db-name"')

@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  VPC:
+    Type: String
+  PublicSubnetA:
+    Type: String
+  VPCEndpointSecurityGroup:
+    Type: String
+  RouteTablePublic:
+    Type: String
+
+Resources:
+  VPCEndpointSecretManager:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: com.amazonaws.ap-northeast-1.secretsmanager
+      VpcEndpointType: Interface
+      VpcId: !Ref VPC
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PublicSubnetA
+      SecurityGroupIds:
+        - !Ref VPCEndpointSecurityGroup
+  VPCEndpointS3:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      ServiceName: com.amazonaws.ap-northeast-1.s3
+      VpcEndpointType: Gateway
+      VpcId: !Ref VPC
+      RouteTableIds:
+        - !Ref RouteTablePublic
+
+Outputs:
+  VPCEndpointSecretManager:
+    Value: !Ref VPCEndpointSecretManager
+  VPCEndpointS3:
+    Value: !Ref VPCEndpointS3

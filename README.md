@@ -18,6 +18,7 @@ Lambdaのイメージを作り、シェルを実行してS3にアップロード
 1. cf-template-01.yamlでECRを作る
 2. ECRに行き、該当のリポジトリの手順通りに、ローカルのイメージをプッシュする
 3. cf-template-02.yamlで、その他のリソースを作成する
+    1. パッケージングをするために、aws cloudfront package コマンドでパッケージングする
     1. パラメーターとして、ECRにプッシュしたイメージのURLを指定する（その他のパラメータも指定）
 4. 踏み台EC2にインスタンスコネクトで接続して、mysqlコマンドでAuroraに繋ぎinitdb.dにあるSQLを実行する
     1. MySQLへの接続情報はSecretsManagerに格納されている

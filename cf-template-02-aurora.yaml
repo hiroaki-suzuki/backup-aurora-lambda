@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+  PrivateSubnetA:
+    Type: String
+  PrivateSubnetC:
+    Type: String
+  PrivateSubnetSecurityGroup:
+    Type: String
+  MasterUsername:
+    Type: String
+  MasterUserPassword:
+    Type: String
+
+Resources:
+  AuroraSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Join [ "-", [ !Ref ProjectName, "sg" ] ]
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetC
+  AuroraClusterParameterGroup:
+    Type: AWS::RDS::DBClusterParameterGroup
+    Properties:
+      DBClusterParameterGroupName: !Join [ "-",[ !Ref ProjectName, "cluster", "pg" ] ]
+      Description: "Aurora ClusterParameterGroup"
+      Family: "aurora-mysql5.7"
+      Parameters:
+        time_zone: "Asia/Tokyo"
+  AuroraInstanceParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      DBParameterGroupName: !Join [ "-", [ !Ref ProjectName, "instance", "pg" ] ]
+      Description: "Aurora InstanceParameterGroup"
+      Family: "aurora-mysql5.7"
+  AuroraInstanceOptionGroup:
+    Type: AWS::RDS::OptionGroup
+    Properties:
+      EngineName: aurora-mysql
+      MajorEngineVersion: 5.7
+      OptionGroupDescription: "Aurora InstanceOptionGroup"
+      OptionGroupName: !Join [ "-", [ !Ref ProjectName, "instance", "og" ] ]
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Delete
+    Properties:
+      DBClusterIdentifier: !Join [ "-", [ !Ref ProjectName, "cluster" ] ]
+      DatabaseName: sample
+      DBClusterParameterGroupName: !Ref AuroraClusterParameterGroup
+      DBSubnetGroupName: !Ref AuroraSubnetGroup
+      Engine: aurora-mysql
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      Port: 3306
+      StorageEncrypted: True
+      VpcSecurityGroupIds:
+        - !Ref PrivateSubnetSecurityGroup
+  AuroraInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref AuroraCluster
+      Engine: aurora-mysql
+      DBInstanceClass: 'db.t3.small'
+      DBInstanceIdentifier: !Join [ "-", [ !Ref ProjectName, 'instance', "01" ] ]
+      DBParameterGroupName: !Ref AuroraInstanceParameterGroup
+      OptionGroupName: !Ref AuroraInstanceOptionGroup
+  # SecretManager
+  Secrets:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: !Join [ "-", [ !Ref ProjectName, 'secrets' ] ]
+      SecretString: !Sub '{"db-host": "${AuroraCluster.Endpoint.Address}", "db-name": "sample", "db-user": "${MasterUsername}", "db-password": "${MasterUserPassword}"}'
+
+Outputs:
+  SecretId:
+    Value: !Ref Secrets

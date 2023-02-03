@@ -1,0 +1,62 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+  VPC:
+    Type: String
+  CidrBlockPublicSubnetA:
+    Type: String
+
+Resources:
+  PublicSubnetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "sg" ] ]
+      GroupDescription: "public subnet security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "public", "subnet", "sg" ] ]
+  PrivateSubnetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "private", "subnet", "sg" ] ]
+      GroupDescription: "private subnet security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: !Ref CidrBlockPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "private", "subnet", "sg" ] ]
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join [ "-", [ !Ref ProjectName, "vpc", "endpoint", "sg" ] ]
+      GroupDescription: "vpc endpoint security group"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: !Ref CidrBlockPublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "vpc", "endpoint", "sg" ] ]
+
+Outputs:
+  PublicSubnetSecurityGroup:
+    Value: !Ref PublicSubnetSecurityGroup
+  PrivateSubnetSecurityGroup:
+    Value: !Ref PrivateSubnetSecurityGroup
+  VPCEndpointSecurityGroup:
+    Value: !Ref VPCEndpointSecurityGroup

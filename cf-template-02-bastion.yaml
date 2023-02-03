@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for Aurora MySQL backup.
+
+Parameters:
+  ProjectName:
+    Type: String
+  PublicSubnetSecurityGroup:
+    Type: String
+  PublicSubnetA:
+    Type: String
+
+Resources:
+  BastionEC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join [ "-", [ !Ref ProjectName, "bastion", "ec2", "role" ] ]
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/EC2InstanceConnect"
+  BastionEC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionEC2Role
+  BastionEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: "ami-0bba69335379e17f8"
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref BastionEC2InstanceProfile
+      KeyName: aws-rirazou0101
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref PublicSubnetSecurityGroup
+          SubnetId: !Ref PublicSubnetA
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref ProjectName, "bastion" ] ]
+      UserData:
+        "Fn::Base64":
+          !Sub |
+          #!/bin/bash
+          yum -y update
+          yum -y remove mariadb-libs
+          yum -y install https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm
+          yum-config-manager –disable mysql80-community
+          yum-config-manager –enable mysql57-community
+          rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+          yum -y install mysql-community-client
+
+Outputs:
+  BastionEC2:
+    Value: !Ref BastionEC2
