@@ -8,7 +8,7 @@ DB_PASS=$(echo "$SECRET_STRING" | jq -r '."db-password"')
 function handler() {
   filename=$(date '+%Y-%m-%d_%H%M%S').sql.gz
 
-  mysqldump --no-tablespaces -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" users | \
+  mysqldump --no-tablespaces --set-gtid-purged=OFF -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" "$DB_NAME" users | \
       gzip | \
       aws s3 cp - s3://"$S3_BUCKET_NAME"/backup/"$filename"
 
